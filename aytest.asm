@@ -10,14 +10,46 @@
 ;
 ; SAVE "name" CODE 60000 5024
 
-AYSEL	EQU	$FFFD
-AYDTA	EQU	$BFFD
+AYSEL		EQU	$FF00
+AYDTA		EQU	$FF01
+
+;MUSIC1	EQU	$4000
+;MUSIC2	EQU	$43E8
+;MUSIC3	EQU	$47D0
+;XTRA		EQU	$4BB8
+;XTRAEND	EQU	XTRA + 385
+;PLAYER	EQU	$4FA0
+
 MUSIC1	EQU	$EA60
 MUSIC2	EQU	$EE48
 MUSIC3	EQU	$F230
-XTRA	EQU	$F618	; should it be $F618? MUSIC3 + 1000
+XTRA		EQU	$F618
 XTRAEND	EQU	XTRA + 385
 PLAYER	EQU	$FA00
+
+mc45		equ $f8
+turbo		equ $fa
+cpld		equ $fc
+cpld2		equ $fd
+memmap	equ $fe
+
+	ORG	0
+	jp $100
+
+	ORG $100
+	ld sp,$6000
+	ld a,$0f		; 0c=5.68MHz 0d=4.46MHz 0e=4.17MHz 0f=3.9MHz
+	out (turbo),a
+	ld hl,ENDCODE
+	ld de,MUSIC1
+	ld bc,endprog-MUSIC1
+	ldir
+pllp	call PLAYER
+	jr pllp
+rtrn	ld e,$ff
+	ret
+
+ENDCODE	EQU	$
 
 
 	ORG	MUSIC1
@@ -130,6 +162,7 @@ MUSICEND	EQU $
 ;F799	DB	$3f
 XTRAEND	DB	$3f
 
+
 	ORG	PLAYER
 
 FA00	jp	FBA5
@@ -176,6 +209,7 @@ RENVSHAP	DB	$00
 
 ; updated by $FB51 $FC72
 ; read by $FDD5
+; FA20
 FA20	DB	$10
 
 ; RAMPLIT + 7
@@ -195,15 +229,18 @@ FA28	DB	$00,$00,$00,$00,$00,$00
 
 ; updated by $FB51 $FBA5 $FD0F
 ; read by $FD43
-CHAMUSICPTR	DB	$6C,$EA	; channel A music data address, $EA60
+; FA2E
+CHAMUSICPTR	DB	$60,$EA	; channel A music data address, $EA60
 	DB	$61,$EA
-CHBMUSICPTR	DB	$54,$EE	; channel B music data address, $EE48
+; FA32
+CHBMUSICPTR	DB	$48,$EE	; channel B music data address, $EE48
 	DB	$49,$EE
-CHCMUSICPTR	DB	$3C,$F2	; channel C music data address, $F230
+; FA36
+CHCMUSICPTR	DB	$30,$F2	; channel C music data address, $F230
 	DB	$31,$F2
 
 ; updated by $FB51 $FBA5
-FA3A	DB	$24,$F6	; some other table, 1000 bytes up from $F23C, CHCMUSICPTR, should be $F618 per new locations
+FA3A	DB	XTRA,XTRA>>8	; some other table, 1000 bytes up from $F23C, CHCMUSICPTR, should be $F618 per new locations
 	DB	$19,$F6 
 
 ; read by $FC72
@@ -238,7 +275,7 @@ FB3F	DB	$00,$00,$00,$00,$00,$00
 
 
 FB45	call	FB51	; play notes for all channels?
-	call	$28E	;poll keyboard
+	call	rtrn		; $28E	;poll keyboard
 	inc	e
 	jr	z,FB45	; continue loop
 	jp	FBC7	; unless key pressed - then exit
@@ -358,7 +395,7 @@ FBF4	ld	c,a		; save channel number in C for later
 	push	hl		; save HL for later - contains register value for note
 	add	a,a		; 16 bit offset to channel data
 	dec	a
-	ld	hl,FA10	; point to table
+	ld	hl,FA10	; point to table (not FA12?)
 	ld	d,$00
 	ld	e,a
 	add	hl,de		; add 16 bit offset
@@ -689,4 +726,5 @@ FDD5	ld	hl,RAMPLIT	; point to amplitudes table
 
 endprog	equ $
 
-	output_bin "player0889.bin",MUSIC1,endprog-MUSIC1    ; The binary file
+	output_bin "ayloader.bin",0,ENDCODE    ; loader of ay code into RAM
+	output_bin "aytest.bin",MUSIC1,endprog-MUSIC1    ; The binary file
