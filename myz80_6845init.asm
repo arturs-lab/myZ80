@@ -1,7 +1,7 @@
-mc45	equ $f8
-turbo	equ $fa
-cpld	equ $fc
-cpld2	equ $fd
+mc45		equ $f8
+turbo		equ $fa
+cpld		equ $fc
+cpld2		equ $fd
 memmap	equ $fe
 
 	org 0
@@ -59,6 +59,22 @@ irq1	ld ($6000),hl
 
 	org $100
 	di		; disable interrupts
+/*
+; testing PCB
+	ld a,3		; turn on turbo mode
+	out (turbo),a
+	ld b,0
+pcb2	ld a,b
+	out (cpld),a
+	ld hl,$0000
+pcb1	dec hl
+	ld a,h
+	or a,l
+	jr nz,pcb1
+	dec b
+	jr pcb2
+; end PCB test
+*/
 	ld hl,tab45	; table of init parameters to load into MC6845
 	ld b,0	; counter of registers
 lp45	ld a,b	; check if counter reached last register
@@ -329,6 +345,10 @@ mm2	ld a,(de)
 	ld a,b
 	or a,c
 	jr nz,mm2
+
+	ld a,$40	; indicate phase 7
+	out (cpld),a
+
 	jp swit
 
 ; compare failed
@@ -370,8 +390,16 @@ swit	ld a,($0 << 5 ) + $10	; memmap address 0, value 10 - ram page 0 in slot 0 -
 	ld a,($2 << 5 ) + $2	; memmap address 2, value 2 - ram page 2 in slot 2
 	out (memmap),a
 	ld sp,$6000	; init SP to top of ram now that RAM passed test
-	ld a,$1			; enable turbo mode
-	out (turbo),a
+	ld a,3		; turn on turbo mode
+	ld a,9		; turn on turbo mode
+sw1	out (turbo),a	; gradually infrease CPU clock
+	dec a
+	cp a,2
+	jr nz,sw1
+
+	ld a,$80	; indicate phase 8
+	out (cpld),a
+
 	ld hl,$4000
 	ld de,$2000
 	ld ($6000),hl
@@ -382,6 +410,9 @@ swit	ld a,($0 << 5 ) + $10	; memmap address 0, value 10 - ram page 0 in slot 0 -
 	ld ($4000),a	; seed first display byte
 	ld a,$f0
 	ld ($6004),a
+
+	ld a,$90	; indicate phase 9
+	out (cpld),a
 
 	im 1				; now can enable interrupts and refresh VRAM
 	ei

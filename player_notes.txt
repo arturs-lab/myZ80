@@ -1,0 +1,14 @@
+cd /c/zeus/
+cp player0889.c ~/
+vim ~/player0889.c 
+gcc ~/player0889.c -o ~/player0889.o
+~/player0889.o
+cat ~/player0889.c > player0889.c
+sed -n -e '/^[0-9A-F]/{s/\([0-9A-F]\{4\}\)\([^a-z]*\)\([a-z].*\)/\1\t\3/;p};/^[^0-9A-F]/p' player0889.asm > player0889_clean.asm
+cat player0889_clean.asm | rev | sed -n -e '/^.[0-9A-F]\{4\}/{s/\(^.[0-9A-F]\{4\}\)\(.*\)/\1/;p}' | rev | sort | uniq > player0889_labels.txt
+./cleanup_labels.bash | tr ' ' '\t' > player0889_labels.asm
+sed -i -e 's/[0-9A-F]\{2\}/$&/g;s/$DB/DB/' dblines.txt
+sed -e 's/\(\tld\t.*,\)\([0-9A-F]\{2,4\}\)/\1$\2/;s/\(\tcp\t\)\([0-9A-F]\{2,4\}\)/\1$\2/;s/\(\tand\t\)\([0-9A-F]\{2,4\}\)/\1$\2/;s/\(\txor\t\)\([0-9A-F]\{2,4\}\)/\1$\2/;' player0889_labels.asm | less
+vim player_add_dollars.bash
+sed -i -e '/^\tDB\t\$/s/ \$/,$/g' player0889_labels2.asm
+
