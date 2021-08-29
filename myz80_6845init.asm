@@ -1,9 +1,13 @@
+turbo	equ $f8
 mc45	equ $fa
 cpld	equ $fc
 memmap	equ $fe
 
 	org 0
-start	di		; disable interrupts
+start	jp $100
+
+	org $100
+	di		; disable interrupts
 	ld hl,tab45	; table of init parameters to load into MC6845
 	ld b,0	; counter of registers
 lp45	ld a,b	; check if counter reached last register
@@ -35,11 +39,11 @@ tab45	db 38	; R0 H. Total
 	db 0	; R16 Light Pen (H)
 	db 0	; R17 Light Pen (L)
 
-outt	ld b,1
+outt	ld b,1	; count and show on display to show that outport works
 out1	ld a,b
 	out (cpld),a
 
-	ld a,$ff
+	ld a,$ff	; do a little delay while counting so it's easier to see
 out2	nop
 	nop
 	nop
@@ -49,122 +53,308 @@ out2	nop
 	inc b
 	jr nz,out1
 
-memt	ld a,$1
+memt	ld a,$1	; indicate phase 1
 	out (cpld),a
 
-	ld hl,$8000
-	ld de,$8001
+	ld hl,$4000	; fill $4000 - $5FFF with 0s
+	ld de,$4001
 	ld bc,$1fff
 	ld (hl),0
 	ldir
 
-	ld a,$2
+	ld a,$2	; indicate phase 2
 	out (cpld),a
 
-	ld hl,$8000
+	ld a,($2 << 5 ) + $3	; memmap address 2, value 3
+	out (memmap),a
+
+	ld hl,$4000	; fill $4000 - $5FFF with 1s
+	ld de,$4001
+	ld bc,$1fff
+	ld (hl),1
+	ldir
+
+;	ld a,($2 << 5 ) + $4	; memmap address 2, value 4
+;	out (memmap),a
+
+;	ld hl,$4000	; fill $4000 - $5FFF with $aa
+;	ld de,$4001
+;	ld bc,$1fff
+;	ld (hl),$aa
+;	ldir
+
+	ld a,$4	; indicate phase 3
+	out (cpld),a
+
+	ld a,($2 << 5 ) + $3	; memmap address 2, value 3
+	out (memmap),a
+
+	ld hl,$4000		; check if 1s are still in bank 3 and didnt get overwritten
+	ld d,1
+; routine below repeats 4 times
+; tempting to put it in subroutine
+; but since we don't know if RAM is good
+; we can't
 	ld bc,$2000
-ty	ld a,0
+ta	ld a,d
 	cp a,(hl)
-	jr nz,tx
+	jr nz,tfail
+	dec bc
+	inc hl
+	ld a,b
+	or a,c
+	jr nz,ta
+
+	ld a,$8	; indicate phase 4
+	out (cpld),a
+
+	ld a,($2 << 5 ) + $2	; memmap address 2, value 2
+	out (memmap),a
+
+	ld hl,$4000		; check if 0s are still in bank 2 and didnt get overwritten
+	ld d,0
+	ld bc,$2000
+tb	ld a,d
+	cp a,(hl)
+	jr nz,tfail
+	dec bc
+	inc hl
+	ld a,b
+	or a,c
+	jr nz,tb
+
+	ld a,$10	; indicate phase 5
+	out (cpld),a
+
+	ld hl,$6000		; bank 3 is also mapped to $6000 - 7FFF, see if 1s are there
+	ld d,1
+	ld bc,$2000
+tc	ld a,d
+	cp a,(hl)
+	jr nz,tfail
+	dec bc
+	inc hl
+	ld a,b
+	or a,c
+	jr nz,tc
+
+	ld a,$20	; indicate phase 6
+	out (cpld),a
+
+;	ld hl,$8000		; bank 4 is also mapped to $8000 - 9FFF, see if $aa are there
+;	ld d,$aa
+;	ld bc,$2000
+;td	ld a,d
+;	cp a,(hl)
+;	jr nz,tfail
+;	dec bc
+;	inc hl
+;	ld a,b
+;	or a,c
+;	jr nz,td
+
+	jp memre
+;	jp blink
+
+; we land here if RAM test failed
+tfail	ld a,h	; show H on output port and wait a bit so user can read it
+	out (cpld),a
+
+; delay. tempting to put it in subroutine but since RAM just failed test we can't
+	ld b,3
+d2	ld de,$ffff
+d1	dec de
+	ld a,d
+	or a,e
+	jr nz,d1
+	dec b
+	jr nz,d2
+
+	ld a,l	; show L on output port and wait a bit so user can read it
+	out (cpld),a
+
+; delay
+	ld b,3
+d4	ld de,$ffff
+d3	dec de
+	ld a,d
+	or a,e
+	jr nz,d3
+	dec b
+	jr nz,d4
+
+	ld a,(hl)	; show (HL) on output port and wait a bit so user can read it
+	out (cpld),a
+
+; delay
+	ld b,3
+d6	ld de,$ffff
+d5	dec de
+	ld a,d
+	or a,e
+	jr nz,d5
+	dec b
+	jr nz,d6
+
+	inc hl	; point to next byte and also show it 
+	ld a,h
+	out (cpld),a
+
+; delay
+	ld b,3
+d8	ld de,$ffff
+d7	dec de
+	ld a,d
+	or a,e
+	jr nz,d7
+	dec b
+	jr nz,d8
+
+	ld a,l
+	out (cpld),a
+
+; delay
+	ld b,3
+d10	ld de,$ffff
+d9	dec de
+	ld a,d
+	or a,e
+	jr nz,d9
+	dec b
+	jr nz,d10
+
+	ld a,(hl)
+	out (cpld),a
+
+cp2	jr cp2
+
+; RAM is good
+; memory remap.
+memre	ld a,($2 << 5 ) + $10	; memmap address 2, value 10 - ram page 0 in slot 2
+	out (memmap),a
+	ld sp,$5000	; init SP to top of ram now that RAM passed test
+
+; Copy ROM to page 0 of RAM
+	ld hl,$0000
+	ld de,$4000
+	ld bc,$1000
+	ldir
+
+; verify
+	ld hl,$0000
+	ld de,$4000
+	ld bc,$1000
+mm2	ld a,(de)
+	cp a,(hl)
+	jr nz,mm1
+	inc de
+	inc hl
+	dec bc
+	ld a,b
+	or a,c
+	jr nz,mm2
+	jp swit
+
+; compare failed
+mm1	ld a,h	; show H on output port and wait a bit so user can read it
+	out (cpld),a
+
+	call delay
+
+	ld a,l	; show L on output port and wait a bit so user can read it
+	out (cpld),a
+
+	call delay
+
+	ld a,(hl)	; show (HL) on output port and wait a bit so user can read it
+	out (cpld),a
+
+	call delay
+
+	inc hl	; point to next byte and also show it 
+	ld a,d
+	out (cpld),a
+
+	call delay
+
+	ld a,e
+	out (cpld),a
+
+	call delay
+
+	ld a,(de)
+	out (cpld),a
+
+ep2	jr ep2
+
+; switch in RAM for ROM
+swit	ld a,($0 << 5 ) + $10	; memmap address 2, value 10 - ram page 0 in slot 0 - ROM
+	out (memmap),a
+	ld a,($2 << 5 ) + $2	; memmap address 2, value 2 - ram page 2 in slot 2
+	out (memmap),a
+	ld a,$1			; enable turbo mode
+	out (turbo),a
+
+; at this point code is running from RAM and can be altered
+; alter code in RAM
+	ld a,$c0	; instead of $50
+	ld (b5+1),a
+	ld a,$30	; instead of $a0
+	ld (ba+1),a
+
+; first make sure memory maps are reset to default
+blink ld a,($2 << 5 ) + $2	; memmap address 2, value 2
+	out (memmap),a
+	ld sp,$5000	; init SP to top of ram now that RAM passed test
+
+bli1	in a,(cpld)	; read input port. keep lower nibble and output on outport
+	and a,$0f
+b5	or a,$50	; this gets altered to $c0 since we're running from RAM
+	out (cpld),a
+
+	ld b,1	; little delay
+	call del1
+
+	in a,(cpld)	; read input port. keep lower nibble and output on outport
+	and a,$0f
+ba	or a,$a0	; this gets altered to $30 since we're running from RAM
+	out (cpld),a
+
+
+	ld b,1	; little delay
+	call del1
+
+	jr bli1
+
+testb	ld bc,$2000
+ty	ld a,d
+	cp a,(hl)
+	jr nz,tz
 	dec bc
 	inc hl
 	ld a,b
 	or a,c
 	jr nz,ty
 
-tx	ld a,$4
-	out (cpld),a
+	ret		; at this point a contains 0
 
-	ld a,b
-	or a,c
-	jr z,blink
-	ld a,h
-	out (cpld),a
+tz	ld a,$ff	; return non-zero on fail
+	ret
 
-	ld b,3
-t4	ld de,$ffff
-t3	dec de
+delay	ld b,3
+del1	ld de,$ffff
+del2	dec de
 	ld a,d
 	or a,e
-	jr nz,t3
+	jr nz,del2
 	dec b
-	jr nz,t4
+	jr nz,del1
 
-	ld a,l
-	out (cpld),a
+	ret
 
-	ld b,3
-t8	ld de,$ffff
-t7	dec de
-	ld a,d
-	or a,e
-	jr nz,t7
-	dec b
-	jr nz,t8
-
-	ld a,(hl)
-	out (cpld),a
-
-	ld b,3
-t14	ld de,$ffff
-t13	dec de
-	ld a,d
-	or a,e
-	jr nz,t13
-	dec b
-	jr nz,t14
-
-	inc hl
-	ld a,h
-	out (cpld),a
-
-	ld b,3
-t10	ld de,$ffff
-t9	dec de
-	ld a,d
-	or a,e
-	jr nz,t9
-	dec b
-	jr nz,t10
-
-	ld a,l
-	out (cpld),a
-
-	ld b,3
-t12	ld de,$ffff
-t11	dec de
-	ld a,d
-	or a,e
-	jr nz,t11
-	dec b
-	jr nz,t12
-
-	ld a,(hl)
-	out (cpld),a
-
-
-cp4	jr cp4
-
-blink ld a,$55
-	out (cpld),a
-
-	ld de,$ffff
-l1	dec de
-	ld a,d
-	or a,e
-	jr nz,l1
-
-	ld a,$aa
-	out (cpld),a
-
-	ld de,$ffff
-l2	dec de
-	ld a,d
-	or a,e
-	jr nz,l2
-
-	jr blink
-
+; just a pattern to mark end of code
+	db $55
+	db $aa
 
 endprog	equ $
 
