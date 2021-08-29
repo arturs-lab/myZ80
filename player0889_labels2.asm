@@ -690,3 +690,4 @@ FDD5	ld	hl,RAMPLIT	; point to amplitudes table
 endprog	equ $
 
 	output_bin "player0889.bin",MUSIC1,endprog-MUSIC1    ; The binary file
+	output_list "player0889.lst"

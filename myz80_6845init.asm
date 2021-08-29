@@ -1,8 +1,8 @@
-mc45		equ $f8
-turbo		equ $fa
-cpld		equ $fc
-cpld2		equ $fd
-memmap	equ $fe
+mc45	equ	$f8
+cpld	equ 	$fc
+cpld2	equ 	$fd
+memmap	equ 	$fe
+turbo	equ 	$ff
 
 	org 0
 start	jp $100
@@ -414,6 +414,7 @@ sw1	out (turbo),a	; gradually infrease CPU clock
 	ld a,$90	; indicate phase 9
 	out (cpld),a
 
+; can't do without interrupt circuitry
 	im 1				; now can enable interrupts and refresh VRAM
 	ei
 
@@ -667,4 +668,4 @@ WrLN	and a,LCD_READ1	; Set WRITE (W/R low)
 endprog	equ $
 
 	output_bin "myz80_6845init.bin",$0000,endprog    ; The binary file
-
+	output_list "myz80_6845init.lst"

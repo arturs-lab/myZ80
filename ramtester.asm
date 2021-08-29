@@ -85,6 +85,7 @@ l7	dec hl
 endprog	equ $
 
 	output_bin "ramtester.bin",$0000,endprog    ; The binary file
+	output_list "ramtester.lst"
 
 
 
